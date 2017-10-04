@@ -1,0 +1,28 @@
+08/02/13 -*- Version 1.1.0 -*-
+* R scripts updated to work with new mapping.
+
+07/02/13 Julien Dutheil
+* Updated to new substitution mapping procedure.
+* More biochemical properties supported, with new syntax.
+
+28/02/12 -*- Version 1.0.2 -*-
+
+28/02/12 Julien Dutheil
+* Compatibility update and packaging improved.
+
+??/??/11 -*- Version 1.0.1 -*-
+
+08/12/10 Julien Dutheil
+* Compatibility update with future Bio++ 2.00, with new mapping classes.
+
+17/09/09 Julien Dutheil
+* Switch to CMake build system.
+
+27/06/08 Julien Dutheil
+* Support for AAIndex file improved.
+
+20/07/07 -*- Version 1.0.0 -*-
+
+20/07/07 Julien Dutheil
+* First release of ConTest.
+
