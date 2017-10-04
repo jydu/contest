@@ -3,44 +3,22 @@
 # Created: 22/08/2009
 
 # Global parameters
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11)
 PROJECT(contest CXX)
+
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
       FORCE)
 ENDIF()
 
-SET(CMAKE_CXX_FLAGS "-Wall -Weffc++ -Wshadow -Wconversion")
-IF(NOT NO_VIRTUAL_COV)
-  SET(NO_VIRTUAL_COV FALSE CACHE BOOL
-      "Disable covariant return type with virtual inheritance, for compilers that do not support it."
-      FORCE)
-ENDIF()
-
-IF(NO_VIRTUAL_COV)
-  MESSAGE("-- Covariant return with virtual inheritance disabled.")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNO_VIRTUAL_COV=1")
-ENDIF()
+SET(CMAKE_CXX_FLAGS "-std=c++11 -Wall -Weffc++ -Wshadow -Wconversion")
 
 IF(NOT NO_DEP_CHECK)
   SET(NO_DEP_CHECK FALSE CACHE BOOL
       "Disable dependencies check for building distribution only."
       FORCE)
 ENDIF(NOT NO_DEP_CHECK)
-
-IF(NOT DOC_COMPRESS)
-  SET(DOC_COMPRESS gzip CACHE STRING
-      "Set program for compressing documentation."
-      FORCE)
-ENDIF(NOT DOC_COMPRESS)
-
-IF(NOT DOC_COMPRESS_EXT)
-  SET(DOC_COMPRESS_EXT gz CACHE STRING
-      "Set extension of compressed documentation."
-      FORCE)
-ENDIF(NOT DOC_COMPRESS_EXT)
-
 
 IF(NO_DEP_CHECK)
   MESSAGE("-- Dependencies checking disabled. Only distribution can be built.")
@@ -57,79 +35,44 @@ IF(BUILD_STATIC)
   SET(CMAKE_CXX_FLAGS "-static -static-libgcc -static-libstdc++ ${CMAKE_CXX_FLAGS}")
 ENDIF()
 
-#build info?
-#IF(NOT DEFINED INFO)
-#  SET(INFO UNIX)
-#ENDIF(NOT DEFINED INFO)
+# Check compression program
+# COMPRESS_PROGRAM controls the choice of program
+# COMPRESS_EXT can be used to override the file extension
+if (NOT COMPRESS_PROGRAM)
+  set (COMPRESS_PROGRAM gzip CACHE STRING "Set program for compressing documentation" FORCE)
+endif ()
+find_program (COMPRESS_BIN NAMES ${COMPRESS_PROGRAM} DOC "${COMPRESS_PROGRAM} compression program")
+if (NOT COMPRESS_BIN)
+  message (STATUS "${COMPRESS_PROGRAM} program not found, text doc will not be compressed")
+else ()
+  # Deduce COMPRESS_EXT for known compression programs if not set
+  if (NOT COMPRESS_EXT)
+    if (${COMPRESS_PROGRAM} STREQUAL "gzip")
+      set (COMPRESS_EXT "gz")
+    elseif (${COMPRESS_PROGRAM} STREQUAL "bzip2")
+      set (COMPRESS_EXT "bz2")
+    else ()
+      set (COMPRESS_EXT "${COMPRESS_PROGRAM}") # Default: program name (works for xz/lzma)
+    endif ()
+  endif ()
+  # Generate command line args (always add -c to output compressed file to stdout)
+  if (${COMPRESS_PROGRAM} STREQUAL "gzip")
+    # -n for no timestamp in files (reproducible builds)
+    set (COMPRESS_ARGS -c -n)
+  else ()
+    set (COMPRESS_ARGS -c)
+  endif ()
+  message (STATUS "Found ${COMPRESS_BIN} compression program, using file extension .${COMPRESS_EXT}")
+endif ()
 
-#build man pages?
-IF(NOT DEFINED MAN)
-  SET(MAN UNIX)
-ENDIF(NOT DEFINED MAN)
+# Find dependencies (add install directory to search)
+if (CMAKE_INSTALL_PREFIX)
+  set (CMAKE_PREFIX_PATH "${CMAKE_INSTALL_PREFIX}" ${CMAKE_PREFIX_PATH})
+endif (CMAKE_INSTALL_PREFIX)
 
-#find executables for documentation
-#FIND_PROGRAM(MAKEINFO_EXE NAMES makeinfo)
-#FIND_PROGRAM(PDFTEX_EXE NAMES pdftex)
-FIND_PROGRAM(NROFF_EXE NAMES nroff)
+include (GNUInstallDirs)
+find_package (bpp-phyl 11.0.0 REQUIRED)
 
-#here is a useful function:
-MACRO(IMPROVED_FIND_LIBRARY OUTPUT_LIBS lib_name include_to_find)
-  #start:
-  FIND_PATH(${lib_name}_INCLUDE_DIR ${include_to_find})
-  INCLUDE_DIRECTORIES(${${lib_name}_INCLUDE_DIR})
-
-  IF(BUILD_STATIC)
-    SET(${lib_name}_STATIC_NAMES lib${lib_name}.a)
-    FIND_LIBRARY(${lib_name}_STATIC_LIBRARY NAMES ${${lib_name}_STATIC_NAMES} PATH_SUFFIXES lib${LIB_SUFFIX})
-    IF(${lib_name}_STATIC_LIBRARY)
-      MESSAGE("-- Library ${lib_name} found here:")
-      MESSAGE("   includes: ${${lib_name}_INCLUDE_DIR}")
-      MESSAGE("   static libraries: ${${lib_name}_STATIC_LIBRARY}")
-    ELSE()
-      MESSAGE(FATAL_ERROR "${lib_name} required but not found.")
-    ENDIF()
-    #add the dependency:
-    SET(${OUTPUT_LIBS} ${${OUTPUT_LIBS}} ${${lib_name}_STATIC_LIBRARY})
-  ELSE()
-    SET(${lib_name}_NAMES ${lib_name} ${lib_name}.lib ${lib_name}.dll)
-    FIND_LIBRARY(${lib_name}_LIBRARY NAMES ${${lib_name}_NAMES} PATH_SUFFIXES lib${LIB_SUFFIX})
-    IF(${lib_name}_LIBRARY)
-      MESSAGE("-- Library ${lib_name} found here:")
-      MESSAGE("   includes: ${${lib_name}_INCLUDE_DIR}")
-      MESSAGE("   dynamic libraries: ${${lib_name}_LIBRARY}")
-    ELSE()
-      MESSAGE(FATAL_ERROR "${lib_name} required but not found.")
-    ENDIF()
-    #add the dependency:
-    SET(${OUTPUT_LIBS} ${${OUTPUT_LIBS}} ${${lib_name}_LIBRARY})
-  ENDIF()
-  
-ENDMACRO(IMPROVED_FIND_LIBRARY)
-
-# Set the CMAKE_PREFIX_PATH for the find_library fonction when using non
-# standard install location
-IF(CMAKE_INSTALL_PREFIX)
-  SET(CMAKE_PREFIX_PATH "${CMAKE_INSTALL_PREFIX}" ${CMAKE_PREFIX_PATH})
-ENDIF(CMAKE_INSTALL_PREFIX)
-
-#Find the libraries. The order is very important for static linkage, it won't
-#link if you change it!
-IMPROVED_FIND_LIBRARY(LIBS bpp-phyl Bpp/Phyl/Tree.h)
-IMPROVED_FIND_LIBRARY(LIBS bpp-seq Bpp/Seq/Alphabet/Alphabet.h)
-IMPROVED_FIND_LIBRARY(LIBS bpp-core Bpp/Clonable.h)
-
-IF(NROFF_EXE)
-  MESSAGE("-- Found nroff here: ${NROFF_EXE}")
-  MESSAGE("   Adding targets: man")
-
-  ADD_CUSTOM_TARGET(man
-    ALL
-    COMMAND cp contest.1.txt contest.1
-    COMMAND gzip -f contest.1
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/man
-    )
-  SET_DIRECTORY_PROPERTIES(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "man/contest.1.gz")
-ENDIF(NROFF_EXE)
 
 # Subdirectories
 ADD_SUBDIRECTORY(ConTest)
@@ -139,45 +82,23 @@ ENDIF(NO_DEP_CHECK)
 
 # Packager
 set(CPACK_PACKAGE_NAME "contest")
-set(CPACK_PACKAGE_VENDOR "CNRS - University Montpellier 2")
-set(CPACK_PACKAGE_VERSION "1.1.0")
+set(CPACK_PACKAGE_VENDOR "Julien Y. Dutheil")
+set(CPACK_PACKAGE_VERSION "1.2.0")
 set(CPACK_PACKAGE_VERSION_MAJOR "1")
-set(CPACK_PACKAGE_VERSION_MINOR "1")
+set(CPACK_PACKAGE_VERSION_MINOR "2")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "ConTest: a program for detecting constrained positions in a molecule.")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/COPYING.txt")
-set(CPACK_RESOURCE_FILE_AUTHORS "${CMAKE_SOURCE_DIR}/AUTHORS.txt")
-SET(CPACK_RESOURCE_FILE_INSTALL "${CMAKE_SOURCE_DIR}/INSTALL.txt")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_AUTHORS "${CMAKE_SOURCE_DIR}/AUTHORS")
+SET(CPACK_RESOURCE_FILE_INSTALL "${CMAKE_SOURCE_DIR}/INSTALL")
 set(CPACK_SOURCE_GENERATOR "TGZ")
-set(CPACK_SOURCE_IGNORE_FILES
- "CMakeFiles"
- "Makefile"
- "_CPack_Packages"
- "CMakeCache.txt"
- ".*\\\\.cmake"
- ".*\\\\.svn"
- ".*\\\\.gz"
- ".*\\\\.zip"
- ".*\\\\.deb"
- ".*\\\\.rpm"
- ".*\\\\.dmg"
- ".*\\\\.sh"
- ".*\\\\..*\\\\.swp"
- ".*stamp"
- "ConTest/\\\\..*"
- "ConTest/contest"
- "debian/tmp"
- "debian/contest"
- "debian/contest\\\\.substvars"
- "debian/comap\\\\.debhelper"
- "debian/debhelper\\\\.log"
- "install_manifest.txt"
- "DartConfiguration.tcl"
- ${CPACK_SOURCE_IGNORE_FILES}
-)
-IF (MACOS)
-  SET(CPACK_GENERATOR "Bundle")
-ENDIF()
+# /!\ This assumes that an external build is used
+SET(CPACK_SOURCE_IGNORE_FILES
+       "/build/" 
+       "/\\\\.git/" 
+       "/\\\\.gitignore" 
+       ${CPACK_SOURCE_IGNORE_FILES}
+       )
 
 SET(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 SET(CPACK_DEBSOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}_${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}.orig")
@@ -185,36 +106,12 @@ INCLUDE(CPack)
 
 #This adds the 'dist' target
 ADD_CUSTOM_TARGET(dist COMMAND ${CMAKE_MAKE_PROGRAM} package_source)
-#ADD_DEPENDENCIES(dist pdf)
-# 'clean' is not (yet) a first class target. However, we need to clean the directories before building the sources:
-IF("${CMAKE_GENERATOR}" MATCHES "Make")
-  ADD_CUSTOM_TARGET(make_clean
-    COMMAND ${CMAKE_MAKE_PROGRAM} clean
-    WORKING_DIRECTORY ${CMAKE_CURRENT_DIR}
-  )
-  ADD_DEPENDENCIES(dist make_clean)
-
-  ADD_CUSTOM_TARGET(make_clean_man
-    COMMAND rm -f *.${DOC_COMPRESS_EXT}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/man
-  )
-  ADD_DEPENDENCIES(dist make_clean_man)
-ENDIF()
-
 
 IF(NOT NO_DEP_CHECK)
 IF (UNIX)
-#This creates deb packages:
-ADD_CUSTOM_TARGET(origdist COMMAND cp ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz ../${CPACK_DEBSOURCE_PACKAGE_FILE_NAME}.tar.gz)
-ADD_DEPENDENCIES(origdist dist)
-ADD_CUSTOM_TARGET(deb dpkg-buildpackage -uc -us -i${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz)
-ADD_DEPENDENCIES(deb origdist)
-#ADD_DEPENDENCIES(deb info man)
-ADD_DEPENDENCIES(deb man)
 
 #This creates rpm packages:
 ADD_CUSTOM_TARGET(rpm rpmbuild -ta ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz)
-#ADD_DEPENDENCIES(rpm dist info man)
 ADD_DEPENDENCIES(rpm dist man)
 
 #ADD_DEPENDENCIES(info install)

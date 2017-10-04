@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
   cout << endl;
   cout << endl;
   cout << "***********************************************************" << endl;
-  cout << "* This is ConTest      version 1.1.0     date: 08/02/2013 *" << endl;
+  cout << "* This is ConTest      version 1.2.0     date: 03/10/2017 *" << endl;
   cout << "*           A program to detect constrained sites.        *" << endl;
   cout << "***********************************************************" << endl;
   cout << endl;
