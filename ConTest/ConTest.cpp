@@ -56,7 +56,7 @@ using namespace std;
 // From bpp-seq:
 #include <Bpp/Seq/SiteTools.h>
 #include <Bpp/Seq/App/SequenceApplicationTools.h>
-#include <Bpp/Seq/AlphabetIndex.all>
+#include <Bpp/Seq/AlphabetIndex/SimpleIndexDistance.h>
 
 // From bpp-phyl:
 #include <Bpp/Phyl/App/PhylogeneticsApplicationTools.h>
@@ -67,7 +67,9 @@ using namespace std;
 #include <Bpp/Phyl/Simulation/HomogeneousSequenceSimulator.h>
 #include <Bpp/Phyl/Io/Newick.h>
 #include <Bpp/Phyl/Parsimony/DRTreeParsimonyScore.h>
-#include <Bpp/Phyl/Mapping.all>
+#include <Bpp/Phyl/Mapping/SubstitutionMappingTools.h>
+#include <Bpp/Phyl/Mapping/SubstitutionRegister.h>
+#include <Bpp/Phyl/Mapping/UniformizationSubstitutionCount.h>
 
 using namespace bpp;
 
@@ -105,10 +107,8 @@ void doCalculations(ofstream& out,
     vector<AlphabetIndex2*>& weights,
     bool outputSites)
 {
-  //!!! const SiteContainer * sites = tl->getData();
   TotalSubstitutionRegister* reg = new TotalSubstitutionRegister(tl->getSubstitutionModel()); 
-  //WeightedSubstitutionCount* subCount = new UniformizationSubstitutionCount(tl->getSubstitutionModel(), reg); 
-  WeightedSubstitutionCount* subCount = new NaiveSubstitutionCount(tl->getSubstitutionModel(), reg); 
+  WeightedSubstitutionCount* subCount = new UniformizationSubstitutionCount(tl->getSubstitutionModel(), reg); 
   vector<unsigned int> scores;
   if (ts)
     scores = ts->getScoreForEachSite();
